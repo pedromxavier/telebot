@@ -1,6 +1,3 @@
-import logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                     level=logging.DEBUG)
 from telebot import Bot
 
 with open('vilabot.token') as file:
