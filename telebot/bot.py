@@ -82,6 +82,12 @@ class Bot(metaclass=MetaBot):
         self.add_handlers()
         stdout[1] << "> Handlers added"
 
+    def main(self):
+        import argparse
+        parser = argparse.ArgumentParser()
+
+        parser.add_argument('--debug')
+
     def run(self, idle=True):
         try:
             self.updater.start_polling()
@@ -123,9 +129,6 @@ class Bot(metaclass=MetaBot):
 
             ## Add Handler to Dispatcher
             self.dispatcher.add_handler(handler, **kwargs)
-
-            ## Include name in command list
-            self.commands.append(command_name)
 
             stdout[3] << f"> Add Command Handler: /{command_name} @{callback}"
 
