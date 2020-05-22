@@ -5,7 +5,7 @@ from telegram import MessageEntity
 from telegram.ext import Updater, CommandHandler, MessageHandler
 
 from telebot import Bot, Filters
-from botlib import stdwar, stderr, stdout
+from telebot.botlib import stdwar, stderr, stdout
 
 with open('vilabot.token') as file:
     TOKEN = file.read()
