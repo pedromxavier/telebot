@@ -1,1 +1,1 @@
-from .bot import Bot, Filters
+from .bot import Bot, Filters, Proxy

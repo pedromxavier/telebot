@@ -1,6 +1,12 @@
 ## Standard Library
 import pickle
 
+def log():
+    global logging
+    import logging
+    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                        level=logging.DEBUG)
+
 def pkload(fname: str):
     with open(fname, 'rb') as file:
         return pickle.load(file)

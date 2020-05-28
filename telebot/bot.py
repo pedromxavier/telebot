@@ -7,14 +7,76 @@ from telegram import ParseMode
 from telegram.ext import Updater, Filters, MessageHandler, CommandHandler
 
 ## Local
+from .proxy import Proxy
+from .layer import Layer
 from .botlib import stream, stdwar, stderr, stdout
 from .data import Data
 
 class MetaBot(type):
 
     def __new__(cls, name: str, bases: tuple, attrs: dict):
+        attrs = cls.cast(attrs)
+        attrs = cls.add_proxies(attrs)
+        attrs = cls.add_layers(attrs)
         attrs = cls.get_handlers(attrs)
         return super().__new__(cls, name, bases, attrs)
+
+    @classmethod
+    def cast(cls, attrs: dict):
+        if 'proxy' in attrs or 'layer' in attrs:
+            raise SyntaxError('Bot class definition may not contain `proxy` or `layer` attributes / methods.')
+
+        if '__cast__' in attrs:
+            proxies = []
+            layers = []
+            for caster in attrs['__cast__']:
+                if type(caster) is Proxy:
+                    proxies.append(caster)
+                elif type(caster) is Layer:
+                    layers.append(caster)
+                else:
+                    raise TypeError('Object in __cast__ is neither Layer nor Proxy')
+            attrs['proxy'] = {proxy.name: proxy.func for proxy in proxies}
+            attrs['layer'] = [layer.decor for layer in layers]
+        return attrs
+
+    @classmethod
+    def add_proxies(cls, attrs: dict):
+        has_proxy, bot_proxy = (True, attrs['proxy']) if ('proxy' in attrs) else (False, None)
+        if has_proxy: stdout[3] << f">> Broadcast Proxies to handlers @{cls}"
+        for name in attrs:
+            attr = attrs[name]
+            ## Add eventual proxies
+            if has_proxy and hasattr(attr, 'handler'):
+                if hasattr(attr, 'proxy'):
+                    attr.proxy = {**bot_proxy, **attr.proxy}
+                else:
+                    setattr(attr, 'proxy', bot_proxy.copy())
+                stdout[3] << f">> Add Proxies from {cls} to {attr}."
+            ## Apply proxy to function stack
+            if hasattr(attr, 'proxy'):
+                attr = Proxy.apply(attr)
+            attrs[name] = attr
+        return attrs
+
+    @classmethod
+    def add_layers(cls, attrs:dict):
+        has_layer, bot_layer = (True, attrs['layer']) if ('layer' in attrs) else (False, None)
+        if has_layer: stdout[3] << f">> Broadcast Layers to handlers @{cls}"
+        for name in attrs:
+            attr = attrs[name]
+            ## Add eventual proxies
+            if has_layer and hasattr(attr, 'handler'):
+                if hasattr(attr, 'layer'):
+                    attr.layer = (bot_layer + attr.layer)
+                else:
+                    setattr(attr, 'layer', bot_layer.copy())
+                stdout[3] << f">> Add Layers from {cls} to {attr}."
+            ## Apply layer to function stack
+            if hasattr(attr, 'layer'):
+                attr = Layer.apply(attr)
+            attrs[name] = attr
+        return attrs
 
     @classmethod
     def get_handlers(cls, attrs: dict):
@@ -22,14 +84,20 @@ class MetaBot(type):
         command_handlers = []
         message_handlers = []
         error_handler = None
+        
         for name in attrs:
             attr = attrs[name]
             if hasattr(attr, 'command_handler'):
+                ## Adds the command name, the handler function and eventual key-word wargs
                 command_handlers.append((attr.name, attr, attr.kw))
-                commands.append(attr.name)
+                ## Controls bot command listing
+                ## Commands handled by functions which name is started with '_' are ignored.
+                if not name.startswith('_'): commands.append((attr.name, attr.description))
             if hasattr(attr, 'message_handler'):
+                ## Adds filters, the handler function and eventual key-word wargs
                 message_handlers.append((attr.filters, attr, attr.kw))
             if hasattr(attr, 'error_handler'):
+                ## Adds the latest defined error handler
                 error_handler = attr
 
         attrs['commands'] = commands
@@ -55,22 +123,6 @@ class Bot(metaclass=MetaBot):
     def __init__(self, token=None, **options):
         self.token = token
 
-    def load(self):
-        try:
-            self.__data__.load(self.bot_name)
-        except FileNotFoundError:
-            pass
-
-    def save(self):
-        self.__data__.save(self.bot_name)
-
-    def clear(self):
-        self.__data__.clear()
-
-    def stop(self):
-        return self.updater.stop()
-
-    def init(self):
         ## Setup Updater
         self.updater = Updater(token=self.token, use_context=True)
         stdout[1] << "> Updater setup"
@@ -82,11 +134,28 @@ class Bot(metaclass=MetaBot):
         self.add_handlers()
         stdout[1] << "> Handlers added"
 
+    def load(self):
+        try:
+            self.__data__.load(self.username)
+            stdout[1] << "> Data Loaded"
+        except FileNotFoundError:
+            stderr[1] << "> Failed to load bot data. Creating new."
+
+    def save(self):
+        self.__data__.save(self.username)
+
+    def clear(self):
+        self.__data__.clear()
+
+    def stop(self):
+        return self.updater.stop()
+
     def main(self):
         import argparse
         parser = argparse.ArgumentParser()
-
         parser.add_argument('--debug')
+
+        self.run()
 
     def run(self, idle=True):
         try:
@@ -110,7 +179,6 @@ class Bot(metaclass=MetaBot):
     ## Context Management
     def __enter__(self, *args, **kwargs):
         self.load()
-        self.init()
         return self
 
     def __exit__(self, *args, **kwargs):
@@ -169,7 +237,7 @@ class Bot(metaclass=MetaBot):
             'message': update.message,
             'message_id' : update.message.message_id,
             'text': update.message.text,
-            'username': update.effective_chat.username,
+            'username': update.effective_user.username,
             'bot': context.bot,
         }    
 
@@ -211,28 +279,17 @@ class Bot(metaclass=MetaBot):
             return callback(self, *args)
         return new_callback
 
-    ## lock_start
-    @classmethod
-    def lock_start(cls, callback):
-        @wraps(callback)
-        def new_callback(self, *args):
-            info = self.get_info(*args)
-            chat = self.get_chat(info['chat_id'])
-            if chat.started:
-                return callback(self, *args)
-            else:
-                return None
-        return new_callback
-
     ## command
     @classmethod
-    def command(cls, command_name: str, **kwargs: dict):
+    def command(cls, command_name: str, description: str='', **kwargs: dict):
         """ callback(self, *args)
         """
         def decor(callback):
+            setattr(callback, 'handler', True)
             setattr(callback, 'command_handler', True)
             setattr(callback, 'name', command_name)
             setattr(callback, 'kw', kwargs)
+            setattr(callback, 'description', description)
             return callback
         return decor
 
@@ -242,6 +299,7 @@ class Bot(metaclass=MetaBot):
         """ callback(self, update, context)
         """
         def decor(callback):
+            setattr(callback, 'handler', True)
             setattr(callback, 'message_handler', True)
             setattr(callback, 'filters', filters)
             setattr(callback, 'kw', kwargs)
@@ -250,14 +308,23 @@ class Bot(metaclass=MetaBot):
 
     ## error
     @classmethod
-    def set_error(cls, callback):
+    def get_error(cls, callback):
+        setattr(callback, 'handler', True)
         setattr(callback, 'error_handler', True)
         return callback
 
     @property
-    def bot_name(self):
+    def name(self):
         return self.__class__.__name__
+
+    @property
+    def username(self):
+        return self.updater.bot.name
 
     @property
     def bot_cache(self):
         return sum([chat.cache for chat in self.__data__.chats.values()], [])
+
+    @property
+    def command_list(self):
+        return "\n".join([f"{name} - {description}" for name, description in self.commands])

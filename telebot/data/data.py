@@ -5,6 +5,8 @@ from ..chat import Chat
 
 class Data(object):
 
+    _EXT = 'bot-data'
+
     _MEMORY_DEFAULT = {
         'chats': {},
         'common': {}
@@ -26,11 +28,11 @@ class Data(object):
             return self.chats[chat_id]
 
     def load(self, bot_name: str):
-        fname = f'{bot_name}.data'
+        fname = f'{bot_name}.{self._EXT}'
         self._memory.update(pkload(fname))
 
     def save(self, bot_name: str):
-        fname = f'{bot_name}.data'
+        fname = f'{bot_name}.{self._EXT}'
         pkdump(fname, self._memory)
 
     def clear(self):
