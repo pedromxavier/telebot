@@ -125,7 +125,7 @@ kwargs = {
     #
     #   py_modules=["my_module"],
     #
-    "packages" : ["telebot", "telebot.botlib", "telebot.data", "telebot.chat"],
+    "packages" : ["telebot", "telebot.botlib", "telebot.chat", "telebot.data", "telebot.filters", "telebot.proxy", "telebot.layer"],
 
     # Specify which Python versions you support. In contrast to the
     # 'Programming Language' classifiers above, 'pip install' will check this
