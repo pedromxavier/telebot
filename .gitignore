@@ -130,3 +130,6 @@ dmypy.json
 
 # Telegram Bot Token
 *.token
+
+# Telegram Bot Data
+*.bot-data
