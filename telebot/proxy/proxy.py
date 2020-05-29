@@ -30,10 +30,10 @@ class Proxy:
     @classmethod
     def apply(cls, callback: callable):
         @wraps(callback)
-        def new_callback(bot, *args):
+        def new_callback(bot, *args, **kwargs):
             info = bot.get_info(*args)
             if cls.allow(bot, info, callback.proxy):
-                return callback(bot, *args)
+                return callback(bot, *args, **kwargs)
             else:
                 return None
         return new_callback

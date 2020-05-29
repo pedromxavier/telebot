@@ -152,10 +152,24 @@ class Bot(metaclass=MetaBot):
 
     def main(self):
         import argparse
-        parser = argparse.ArgumentParser()
-        parser.add_argument('--debug')
+        parser = argparse.ArgumentParser(description=self.description)
+        parser.add_argument(
+            '--debug',
+            dest='debug',
+            type=int,
+            action='store_const',
+            help='Set debug level (verbosity), from 0 to 5',
+            default=0,
+            choices=[0, 1, 2, 3, 4, 5],
+            )
+        args = parser.parse_args()
+        stream.set_lvl(args.debug)
+        with self:
+            self.run()
 
-        self.run()
+    @property
+    def description(self):
+        return "A Telegram Bot"
 
     def run(self, idle=True):
         try:
@@ -193,10 +207,12 @@ class Bot(metaclass=MetaBot):
     def add_command_handlers(self):
         for command_name, callback, kwargs in self.command_handlers:
             ## Create Handler Object
-            handler = CommandHandler(command_name, self.static(callback))
+            handler_kwargs = {key: kwargs[key] for key in kwargs if key != 'group'}
+            handler = CommandHandler(command_name, self.static(callback), **handler_kwargs)
 
             ## Add Handler to Dispatcher
-            self.dispatcher.add_handler(handler, **kwargs)
+            group_kwargs = {'group': kwargs['group']} if 'group' in kwargs else {}
+            self.dispatcher.add_handler(handler, **group_kwargs)
 
             stdout[3] << f"> Add Command Handler: /{command_name} @{callback}"
 
@@ -206,10 +222,12 @@ class Bot(metaclass=MetaBot):
             filters = reduce(lambda x, y: x & y, filters)
 
             ## Create Handler Object
-            handler = MessageHandler(filters, self.static(callback), **kwargs)
+            handler_kwargs = {key: kwargs[key] for key in kwargs if key != 'group'}
+            handler = MessageHandler(filters, self.static(callback), **handler_kwargs)
 
             ## Add Handler to Dispatcher
-            self.dispatcher.add_handler(handler)
+            group_kwargs = {'group': kwargs['group']} if 'group' in kwargs else {}
+            self.dispatcher.add_handler(handler, **group_kwargs)
 
             stdout[3] << f"> Add Message Handler: [{filters}] @{callback}"
 
@@ -220,7 +238,10 @@ class Bot(metaclass=MetaBot):
             break
 
     def static(self, callback):
-        return (lambda update, context: callback(self, update, context))
+        @wraps(callback)
+        def new_callback(update, context, **kwargs):
+            return callback(self, update, context, **kwargs)
+        return new_callback
 
     def get_info(self, *args):
         return args[0] if (len(args) == 1) else self._get_info(args[0], args[1])
@@ -237,6 +258,7 @@ class Bot(metaclass=MetaBot):
             'message': update.message,
             'message_id' : update.message.message_id,
             'text': update.message.text,
+            'args': context.args,
             'username': update.effective_user.username,
             'bot': context.bot,
         }    
@@ -251,33 +273,6 @@ class Bot(metaclass=MetaBot):
         """
         """
         return self.__data__.get_chat(chat_id)
-    
-    def start_chat(self, chat_id: int):
-        """
-        """
-        return self.get_chat(chat_id).start()
-
-    ## Decorators
-
-    ## with_info
-    @classmethod
-    def with_info(cls, callback):
-        @wraps(callback)
-        def new_callback(self, *args):
-            info = self.get_info(*args)
-            return callback(self, info)
-        return new_callback
-
-    ## cache
-    @classmethod
-    def cache(cls, callback):
-        @wraps(callback)
-        def new_callback(self, *args):
-            info = self.get_info(*args)
-            chat = self.get_chat(info['chat_id'])
-            chat.save(info['message'])
-            return callback(self, *args)
-        return new_callback
 
     ## command
     @classmethod

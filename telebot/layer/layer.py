@@ -53,7 +53,7 @@ class Layer:
 @Layer.layer
 def with_info(callback: callable):
     @wraps(callback)
-    def new_callback(self, *args):
+    def new_callback(self, *args, **kwargs):
         info = self.get_info(*args)
-        return callback(self, info)
+        return callback(self, info, **kwargs)
     return new_callback
