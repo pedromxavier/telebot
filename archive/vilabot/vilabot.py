@@ -36,7 +36,8 @@ class VilaBot(Bot):
     def start(self, info):
         stdout[2] << f"> /start from @{info['username']}"
         ## Starts chat
-        self.start_chat(info['chat_id'])
+        chat = self.get_chat(info['chat_id'])
+        chat.start()
         kwargs = {
             'chat_id': info['chat_id'],
             'text': self.uivo,
