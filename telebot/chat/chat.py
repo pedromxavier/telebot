@@ -1,6 +1,8 @@
+from ..game import Game
+
 class Chat(object):
 
-    def __init__(self, chat_id):
+    def __init__(self, chat_id: int):
         self.__chat_id = chat_id
         self.__started = False
         self.__awake = True
@@ -35,3 +37,9 @@ class Chat(object):
     def cache(self):
         return self.__cache.copy()
 
+class GameChat(Chat):
+
+    def __init__(self, chat_id: int):
+        Chat.__init__(self, chat_id)
+
+        self.__game = Game()
