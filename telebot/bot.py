@@ -260,6 +260,8 @@ class Bot(metaclass=MetaBot):
             'text': update.message.text,
             'args': context.args,
             'username': update.effective_user.username,
+            'user': update.effective_user,
+            'user_id': update.effective_user.id,
             'bot': context.bot,
         }    
 
@@ -307,6 +309,19 @@ class Bot(metaclass=MetaBot):
         setattr(callback, 'handler', True)
         setattr(callback, 'error_handler', True)
         return callback
+
+    # keyboard
+    @classmethod
+    def button(cls, key:str, *rows):
+        keyboard = [[InlineKeyboardButton(value, callback_data=value) for value in row] for row in rows]
+        return InlineKeyboardMarkup(keyboard)
+
+    @classmethod
+    def button_handler(cls, key: str):
+        def decor(callback):
+            setattr(callback, 'query_handler', True)
+            setattr(callback, 'pattern', '')
+            return callback
 
     @property
     def name(self):

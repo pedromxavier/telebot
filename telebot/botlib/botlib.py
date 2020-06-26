@@ -1,5 +1,6 @@
 ## Standard Library
 import pickle
+import random
 
 def log():
     global logging
@@ -23,3 +24,7 @@ def dump(fname: str, s: str):
     with open(fname, 'w') as file:
         return file.write(s)
 
+def shuffled(x: list) -> list:
+    y = list(x)
+    random.shuffle(y)
+    return y

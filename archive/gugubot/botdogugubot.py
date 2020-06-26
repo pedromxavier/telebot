@@ -1,27 +1,43 @@
 import traceback
 import re
-from random import randint
+import random
 
 from telegram import Message, MessageEntity
-from telegram.ext import Updater, CommandHandler, MessageHandler, BaseFilter
+from telegram.ext import Updater, CommandHandler, MessageHandler, BaseFilter, InlineQueryHandler
 
-from telebot import Bot, Filters
+from telebot import Filters
+from telebot.game import GameBot, Game
 from telebot.proxy import Proxy, lock_start
 from telebot.layer import Layer, with_info
 from telebot.filters import Mention
-from telebot.botlib import log, load, stdwar, stderr, stdout
+from telebot.botlib import log, load, stdwar, stderr, stdout, shuffled
+
+from collections import deque
 
 TOKEN = load('botdogugubot.token')
 
-class GuguBot(Bot):
+class GuguGame(Game):
+
+    def __init__(self):
+        Game.__init__(self)
+        self.__guguqueue = deque(shuffled(self.__players))
+        self.__gugu = None
+
+    def next_gugu(self):
+        return self.__guguqueue.pop()
+
+class GuguBot(GameBot):
 
     __cast__ = [with_info, lock_start]
+    __game__ = GuguGame
+
+    OBJECTS = load('objects.txt').split('\n')
 
     def get_answer(self, text: str, **kwargs):
         return text
         
     @lock_start.invert
-    @Bot.command('start', 'Inicializa um chat com o Bot')
+    @GameBot.command('start', 'Inicializa um chat com o Bot')
     def start(self, info):
         stdout[2] << f"> /start from @{info['username']}"
         ## Starts chat
@@ -29,27 +45,36 @@ class GuguBot(Bot):
         chat.start()
         kwargs = {
             'chat_id': info['chat_id'],
-            'text': self.uivo,
+            'text': 'Você está no Domingo Legal!',
         }
         return info['bot'].send_message(**kwargs)
 
     ## Jogo
 
-    @Bot.command('startgame', 'Cria uma partida')
-    def startgame(self, info):
+    @GameBot.command('jogar', 'Cria uma partida')
+    def jogar(self, info: dict):
         stdout[2] << f"> /startgame from @{info['username']} in {info['group']}"
-        ...
+        self.game[info['group_id']]
 
-    @Bot.command('join', 'Entra em uma partida')
-    def join(self, info):
-        ...
 
-    @Bot.command('flee', 'Sai de uma partida')
-    def flee(self, info):
+
+
+
+    @GameBot.command('entrar', 'Entra em uma partida')
+    def entrar(self, info: dict):
+        user = info['user_id']
+        self.game.user_join(user)
+
+    @GameBot.command('sair', 'Sai de uma partida')
+    def sair(self, info: dict):
         ... 
 
-    @Bot.command('comandos', 'Lista os comandos disponíveis')
-    def comandos(self, info):
+    @GameBot.command('jogadores', 'Lista os jogadores')
+    def jogadores(self, info: dict):
+        ...
+
+    @GameBot.command('comandos', 'Lista os comandos disponíveis')
+    def comandos(self, info: dict):
         stdout[2] << f"> /comandos from @{info['username']}"
         kwargs = {
             'chat_id': info['chat_id'],
@@ -57,7 +82,7 @@ class GuguBot(Bot):
         }
         return info['bot'].send_message(**kwargs)
         
-    @Bot.command('lista')
+    @GameBot.command('lista')
     def _lista(self, info):
         stdout[2] << f"> /lista from @{info['username']}"
         kwargs = {
@@ -66,17 +91,8 @@ class GuguBot(Bot):
         }
         return info['bot'].send_message(**kwargs)
 
-    @Bot.message(~Filters.command, Filters.text, ~Filters.group)
-    def echo(self, info):
-        stdout[2] << f"> Text Message from @{info['username']}:\n{info['text']}"
-        kwargs = {
-            'chat_id': info['chat_id'],
-            'text': self.get_answer(info['text']),
-        }
-        return info['bot'].send_message(**kwargs)
-
-    @Bot.message(Filters.command)
-    def unknown(self, info):
+    @GameBot.message(Filters.command)
+    def unknown(self, info: dict):
         stdout[2] << f"> Unknown command '{info['text']}' from @{info['username']}"
         kwargs = {
             'chat_id': info['chat_id'],
@@ -85,12 +101,12 @@ class GuguBot(Bot):
         }
         return info['bot'].send_message(**kwargs)
 
-    @Bot.get_error
+    @GameBot.get_error
     def error(self, info):
         for line in traceback.format_tb(info['error'].__traceback__):
             stderr << line
         stderr << info['error']
 
 if __name__ == '__main__':
-    with VilaBot(TOKEN) as bot:
+    with GuguBot(TOKEN) as bot:
         bot.run()

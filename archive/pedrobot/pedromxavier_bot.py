@@ -47,5 +47,4 @@ class PedroBot(Bot):
         info['bot'].send_message(**kwargs)
 
 if __name__ == '__main__':
-    with PedroBot(TOKEN) as bot:
-        bot.run()
+    PedroBot(TOKEN).main()
