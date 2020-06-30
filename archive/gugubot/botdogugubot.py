@@ -59,7 +59,6 @@ class GuguGame(Game):
             'reply_to_message_id': info['message_id'],
             'reply_markup': keyboard_markup,
         }
-
         return self.bot.send_animation(**kwargs)
 
     @Game.finish
@@ -139,8 +138,7 @@ class GuguBot(GameBot):
                 'text': 'Sem a sua caravana, não dá pra vir no Domingo Legal.'
             }
             return info['bot'].send_message(**kwargs)
-
-        if info['chat_id'] in self.games:
+        elif info['chat_id'] in self.games:
             kwargs = {
                 'chat_id': info['chat_id'],
                 'text': 'Já tem um jogo rolando nesse grupo!',
@@ -153,10 +151,18 @@ class GuguBot(GameBot):
             
             ## Start Game
             return self.games[info['chat_id']].start()
-            
+
+    @GameBot.command('iniciar', 'Inicia a partida')
+    def iniciar(self, info: dict):
+        """
+        """
+        game = self.get_game(info)
+        game.start()
 
     @GameBot.command('sair', 'Sai de uma partida')
     def sair(self, info: dict):
+        """
+        """
         ## Verifica se uma pessoa está em um grupo
         if ((info['type'] not in {'group', 'supergroup'})
             or (info['chat_id'] not in self.games)
