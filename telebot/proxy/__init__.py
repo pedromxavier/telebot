@@ -1,1 +1,2 @@
-from .proxy import Proxy, lock_start, lock_awake
+from .proxy import Proxy
+from .proxy import lock_start, lock_awake, lock_group

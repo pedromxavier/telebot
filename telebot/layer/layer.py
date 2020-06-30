@@ -1,12 +1,12 @@
 from functools import wraps
-from telebot.botlib import stdout
+from ..botlib import stdout, stderr, stdwar, stream
 
 class Layer:
     """ func(bot: Bot, info: dict) -> bool
 
         Example:
 
-        @layer.layer('reply')
+        @Layer.layer
         def block_politics(bot, info):
             return 'politics' not in info['text']
 
@@ -57,3 +57,14 @@ def with_info(callback: callable):
         info = self.get_info(*args)
         return callback(self, info, **kwargs)
     return new_callback
+
+## log
+@Layer.layer
+def log(level: int=None):
+    def decor(callback: callable):
+        @wraps(callback)
+        def new_callback(self, *args, **kwargs):
+            stdout[level] << f"> call @ {self}"
+            return callback(self, *args, **kwargs)
+        return new_callback
+    return decor

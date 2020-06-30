@@ -84,8 +84,13 @@ def lock_start(bot: object, info: dict):
     chat = bot.get_chat(info['chat_id'])
     return chat.started
 
-## lock_start
+## lock_awake
 @Proxy.proxy('sleep')
 def lock_awake(bot: object, info: dict):
     chat = bot.get_chat(info['chat_id'])
     return chat.awake
+
+## lock_group
+@Proxy.proxy('group')
+def lock_group(bot: object, info: dict):
+    return info['type'] in {'group', 'supergroup'}

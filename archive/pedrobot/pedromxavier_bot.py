@@ -2,7 +2,7 @@
 from minerva import minerva
 
 ## Telegram
-from telebot import Bot, Filters
+from telebot import TeleBot, Filters
 from telebot.proxy import Proxy, lock_start
 from telebot.layer import Layer, with_info
 from telebot.botlib import load, stream, stderr, stdout, stdwar
@@ -13,7 +13,7 @@ TOKEN = load('pedromxavier_bot.token')
 def pedro(bot: Bot, info: dict):
     return (info['username'] == 'pedromxavier')
 
-class PedroBot(Bot):
+class PedroBot(TeleBot):
 
     __cast__ = [with_info, lock_start, pedro]
 

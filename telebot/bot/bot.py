@@ -1,18 +1,20 @@
 ## Standard Library
-from functools import wraps, reduce
 import re
+from functools import wraps, reduce
 
 ## Third-Party
-from telegram import ParseMode
-from telegram.ext import Updater, Filters, MessageHandler, CommandHandler
+from telegram import Update
+from telegram import ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, Filters, CallbackContext
+from telegram.ext import MessageHandler, CommandHandler, InlineQueryHandler, CallbackQueryHandler
 
 ## Local
-from .proxy import Proxy
-from .layer import Layer
-from .botlib import stream, stdwar, stderr, stdout
-from .data import Data
+from ..proxy import Proxy
+from ..layer import Layer
+from ..botlib import stream, stdwar, stderr, stdout
+from ..data import Data
 
-class MetaBot(type):
+class MetaTeleBot(type):
 
     def __new__(cls, name: str, bases: tuple, attrs: dict):
         attrs = cls.cast(attrs)
@@ -83,6 +85,7 @@ class MetaBot(type):
         commands = []
         command_handlers = []
         message_handlers = []
+        query_handlers = []
         error_handler = None
         
         for name in attrs:
@@ -96,6 +99,9 @@ class MetaBot(type):
             if hasattr(attr, 'message_handler'):
                 ## Adds filters, the handler function and eventual key-word wargs
                 message_handlers.append((attr.filters, attr, attr.kw))
+            if hasattr(attr, 'query_handler'):
+                ## Comment
+                query_handlers.append((attr, attr.pattern))
             if hasattr(attr, 'error_handler'):
                 ## Adds the latest defined error handler
                 error_handler = attr
@@ -103,10 +109,11 @@ class MetaBot(type):
         attrs['commands'] = commands
         attrs['command_handlers'] = command_handlers
         attrs['message_handlers'] = message_handlers
+        attrs['query_handlers'] = query_handlers
         attrs['error_handler'] = error_handler
         return attrs
 
-class Bot(metaclass=MetaBot):
+class TeleBot(metaclass=MetaTeleBot):
 
     ## Constants
     MARKDOWN = ParseMode.MARKDOWN_V2
@@ -116,6 +123,7 @@ class Bot(metaclass=MetaBot):
     commands = []
     command_handlers = []
     message_handlers = []
+    query_handlers = []
     error_handlers = []
 
     __data__ = Data()
@@ -202,6 +210,7 @@ class Bot(metaclass=MetaBot):
     def add_handlers(self):
         self.add_command_handlers()
         self.add_message_handlers()
+        self.add_query_handlers()
         self.add_error_handler()
 
     def add_command_handlers(self):
@@ -231,6 +240,15 @@ class Bot(metaclass=MetaBot):
 
             stdout[3] << f"> Add Message Handler: [{filters}] @{callback}"
 
+    def add_query_handlers(self):
+        for callback, pattern in self.query_handlers:
+            handler = CallbackQueryHandler(self.static(callback), pattern=pattern)
+
+            ## Add Handler to Dispatcher
+            self.dispatcher.add_handler(handler)
+
+            stdout[3] << f"> Add Message Handler: [{pattern}] @{callback}"
+
     def add_error_handler(self):
         for callback in self.error_handlers:
             self.dispatcher.add_error_handler(self.static(callback))
@@ -246,7 +264,7 @@ class Bot(metaclass=MetaBot):
     def get_info(self, *args):
         return args[0] if (len(args) == 1) else self._get_info(args[0], args[1])
 
-    def _get_info(self, update, context) -> dict:
+    def _get_info(self, update: Update, context) -> dict:
         """ get_info(update, context) -> dict
             This function is intended to gather the most relevant information
             from these two objects into a single dictionary.
@@ -255,11 +273,16 @@ class Bot(metaclass=MetaBot):
             'error': context.error,
             'chat': update.effective_chat,
             'chat_id': update.effective_chat.id,
+            'type': update.effective_chat.type,
+            'title': update.effective_chat.title,
             'message': update.message,
             'message_id' : update.message.message_id,
             'text': update.message.text,
             'args': context.args,
             'username': update.effective_user.username,
+            'name': update.effective_user.name,
+            'full_name': update.effective_user.full_name,
+            'query': update.callback_query,
             'user': update.effective_user,
             'user_id': update.effective_user.id,
             'bot': context.bot,
@@ -312,16 +335,58 @@ class Bot(metaclass=MetaBot):
 
     # keyboard
     @classmethod
-    def button(cls, key:str, *rows):
-        keyboard = [[InlineKeyboardButton(value, callback_data=value) for value in row] for row in rows]
+    def keyboard_markup(cls, key:str, *rows) -> InlineKeyboardMarkup:
+        """ keyboard_markup(key: str, *rows) -> InlineKeyboardMarkup
+
+            Example:
+            >>> keyboard_markup("data-01",
+                ["Option1", "Option2"],
+                [("Pay!", {'pay': True})],
+                [("some fancy url", {'url': 'http://fancy.url'})]
+            )
+
+        """
+        if re.match('[a-zA-Z][a-zA-Z0-9_-]+', key) is None:
+            raise ValueError(f"Key `{key}` doesn't match regex `[a-zA-Z][a-zA-Z0-9_-]+`.")
+
+        keyboard = []
+        for row in rows:
+            keyboard_row = []
+            for value in row:
+                if type(value) is str:
+                    button = InlineKeyboardButton(value, callback_data=f'{key}:{value}') 
+                elif type(value) is tuple and len(value) == 2:
+                    text, kwargs = value
+                    if 'data' in kwargs:
+                        data = kwargs['data']
+                    else:
+                        data = text
+                    assert type(text) is str and type(kwargs) is dict
+                    button = InlineKeyboardButton(text, callback_data=f'{key}:{data}', **kwargs)
+                else:
+                    raise ValueError("DOCUMENT ME PLEASE :'(")
+                    
+                keyboard_row.append(button)
+            keyboard.append(keyboard_row)
         return InlineKeyboardMarkup(keyboard)
 
     @classmethod
-    def button_handler(cls, key: str):
+    def query(cls, key: str):
+        pattern = re.compile(f'\\b{key}\\b\\:(.+)')
         def decor(callback):
-            setattr(callback, 'query_handler', True)
-            setattr(callback, 'pattern', '')
+            if re.match('[a-zA-Z]+', key) is None:
+                raise ValueError(f"Key `{key}` doesn't match regex `[a-zA-Z]+`.")
+
+            @wraps(callback)
+            def new_callback(self, *args, **kwargs):
+                info = self.get_info(*args)
+                data = pattern.match(info['query'].data).group(1)
+                return callback(self, *args, data, **kwargs)
+                
+            setattr(new_callback, 'query_handler', True)
+            setattr(new_callback, 'pattern', pattern)
             return callback
+        return decor
 
     @property
     def name(self):

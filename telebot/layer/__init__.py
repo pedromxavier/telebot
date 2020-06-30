@@ -1,1 +1,1 @@
-from .layer import Layer, with_info
+from .layer import Layer, with_info, log

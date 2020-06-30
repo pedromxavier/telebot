@@ -4,13 +4,13 @@ import re
 from random import randint
 
 from telegram import Message, MessageEntity
-from telegram.ext import Updater, CommandHandler, MessageHandler, BaseFilter
+from telegram.ext import Updater, CommandHandler, MessageHandler, BaseFilter, Filters
 
-from telebot import Bot, Filters
+from telebot import TeleBot
 from telebot.proxy import Proxy, lock_start, lock_awake
 from telebot.layer import Layer, with_info
 from telebot.filters import Mention
-from telebot.botlib import log, load, stdwar, stderr, stdout
+from telebot.botlib import start_logging, load, stdwar, stderr, stdout
 
 TOKEN = load('vilabot.token')
 
@@ -24,7 +24,7 @@ class MoonEmoji(BaseFilter):
     def filter(self, message: Message):
         return self.regex.search(message.text) is not None
 
-class VilaBot(Bot):
+class VilaBot(TeleBot):
 
     __cast__ = [with_info, lock_start, lock_awake]
 
@@ -32,7 +32,7 @@ class VilaBot(Bot):
         return text
         
     @lock_start.invert
-    @Bot.command('start', 'Inicializa um chat com o Bot')
+    @TeleBot.command('start', 'Inicializa um chat com o bot')
     def start(self, info):
         stdout[2] << f"> /start from @{info['username']}"
         ## Starts chat
@@ -44,7 +44,7 @@ class VilaBot(Bot):
         }
         return info['bot'].send_message(**kwargs)
 
-    @Bot.command('lorem', 'Gera um parágrafo Lorem Ipsum')
+    @TeleBot.command('lorem', 'Gera um parágrafo Lorem Ipsum')
     def lorem(self, info):
         stdout[2] << f"> /lorem from @{info['username']}"
         kwargs = {
@@ -53,7 +53,7 @@ class VilaBot(Bot):
         }
         return info['bot'].send_message(**kwargs)
 
-    @Bot.command('comandos', 'Lista os comandos disponíveis')
+    @TeleBot.command('comandos', 'Lista os comandos disponíveis')
     def comandos(self, info):
         stdout[2] << f"> /comandos from @{info['username']}"
         kwargs = {
@@ -62,7 +62,7 @@ class VilaBot(Bot):
         }
         return info['bot'].send_message(**kwargs)
 
-    @Bot.command('durma', 'Bota o VilaBot para dormir')
+    @TeleBot.command('durma', 'Bota o VilaBot para dormir')
     def durma(self, info):
         stdout[2] << f"> /durma from @{info['username']}"
         chat = self.get_chat(info['chat_id'])
@@ -74,7 +74,7 @@ class VilaBot(Bot):
         return info['bot'].send_message(**kwargs)
 
     @lock_awake.invert
-    @Bot.command('acorde', 'Manda o VilaBot acordar')
+    @TeleBot.command('acorde', 'Manda o VilaBot acordar')
     def acorde(self, info):
         stdout[2] << f"> /acorde from @{info['username']}"
         chat = self.get_chat(info['chat_id'])
@@ -85,7 +85,7 @@ class VilaBot(Bot):
         }
         return info['bot'].send_message(**kwargs)
 
-    @Bot.command('uive', 'Uiva o lobo')
+    @TeleBot.command('uive', 'Uiva o lobo')
     def uive(self, info):
         stdout[2] << f"> /uive from @{info['username']}"
         kwargs = {
@@ -94,7 +94,7 @@ class VilaBot(Bot):
         }
         return info['bot'].send_message(**kwargs)
 
-    @Bot.command('lista')
+    @TeleBot.command('lista')
     def _lista(self, info):
         stdout[2] << f"> /lista from @{info['username']}"
         kwargs = {
@@ -103,7 +103,7 @@ class VilaBot(Bot):
         }
         return info['bot'].send_message(**kwargs)
 
-    @Bot.message(Filters.text & MoonEmoji())
+    @TeleBot.message(Filters.text & MoonEmoji())
     def moon_emoji(self, info):
         stdout[2] << f"> Text Message with Moon Emoji from @{info['username']}:\n{info['text']}"
         kwargs = {
@@ -113,7 +113,7 @@ class VilaBot(Bot):
         }
         return info['bot'].send_message(**kwargs)
 
-    @Bot.message(Mention('ovilabot'))
+    @TeleBot.message(Mention('ovilabot'))
     def mention(self, info):
         stdout[2] << f"> Text Message from @{info['username']}:\n{info['text']}"
         kwargs = {
@@ -123,7 +123,7 @@ class VilaBot(Bot):
         }
         return info['bot'].send_message(**kwargs)
 
-    @Bot.message(~Filters.command, Filters.text, ~Filters.group)
+    @TeleBot.message(~Filters.command, Filters.text, ~Filters.group)
     def echo(self, info):
         stdout[2] << f"> Text Message from @{info['username']}:\n{info['text']}"
         kwargs = {
@@ -132,7 +132,7 @@ class VilaBot(Bot):
         }
         return info['bot'].send_message(**kwargs)
 
-    @Bot.message(Filters.command)
+    @TeleBot.message(Filters.command)
     def unknown(self, info):
         stdout[2] << f"> Unknown command '{info['text']}' from @{info['username']}"
         kwargs = {
@@ -142,7 +142,7 @@ class VilaBot(Bot):
         }
         return info['bot'].send_message(**kwargs)
 
-    @Bot.get_error
+    @TeleBot.get_error
     def error(self, info):
         for line in traceback.format_tb(info['error'].__traceback__):
             stderr << line

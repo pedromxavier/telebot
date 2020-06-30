@@ -1,26 +1,27 @@
 ## Standard Library
 import pickle
+import io
 import random
 
-def log():
+def start_logging():
     global logging
     import logging
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                         level=logging.DEBUG)
 
-def pkload(fname: str):
+def pkload(fname: str) -> object:
     with open(fname, 'rb') as file:
         return pickle.load(file)
 
-def pkdump(fname: str, obj: object):
+def pkdump(fname: str, obj: object) -> None:
     with open(fname, 'wb') as file:
-        pickle.dump(obj, file)
+        return pickle.dump(obj, file)
 
-def load(fname: str):
+def load(fname: str) -> str:
     with open(fname, 'r') as file:
         return file.read()
 
-def dump(fname: str, s: str):
+def dump(fname: str, s: str) -> int:
     with open(fname, 'w') as file:
         return file.write(s)
 
